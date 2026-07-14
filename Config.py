@@ -12,36 +12,39 @@ def bool_from_env(name: str, default: bool) -> bool:
 
 @dataclass
 class ConfigClassicML:
-    # --- Configurações Gerais ---
+    # configurações gerais
     seed: int = 42
-    img_size: int = 224  # Necessário para o cv2.resize no FeatureExtractor
+    img_size: int = 224
     num_classes: int = 2
 
-    # --- Divisão de Dados ---
-    # Alternativas propostas: 0.50 (50/50), 0.40 (60/40), 0.60 (40/60)
-    test_size: float = 0.30  # Padrão: 70% Treino / 30% Teste
+    """ divisao dos dados
+    70% treino  / 30% teste
+    50          / 50
+    60          / 40
+    40          / 60
+    """
+    test_size: float = 0.30
 
-    # --- Pré-processamento Estático ---
+    # pre processamento estatico
     clahe: bool = True
 
-    # Nota: Data Augmentation dinâmico e Reinhard foram removidos do escopo
+    # Data Augmentation dinâmico e Reinhard foram removidos do escopo
     # clássico para manter a extração determinística.
 
-    # --- Hiperparâmetros do KNN ---
-    # Valores comuns cobrados na arguição do baseline
+    # hiperparametros do KNN
     knn_neighbors: int = 5
     knn_weights: str = "distance"  # 'uniform' ou 'distance' (útil para desbalanceamento)
     knn_metric: str = "euclidean"  # 'euclidean' ou 'manhattan'
 
-    # --- Hiperparâmetros do Naive Bayes ---
+    # hiperparametros do naive bayes
     # var_smoothing resolve o problema da variância zero na distribuição Gaussiana[cite: 1]
     nb_var_smoothing: float = 1e-9
 
-    # --- Caminhos dos Diretórios ---
+    # diretorios
     dataset_root: str = "ROP dataset"
     images_dir: str = f"{dataset_root}/image"
     metadata_path: str = f"{dataset_root}/zip information.xlsx"
-    results_dir: str = ""  # Onde salvaremos métricas ou modelos .pkl, se necessário
+    results_dir: str = ""  # resultados
 
     def __post_init__(self):
         self.clahe = bool_from_env("CLAHE", self.clahe)

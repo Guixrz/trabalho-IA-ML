@@ -2,8 +2,7 @@
 Dataset.py — Manipulação do dataset Zhao.
 
 Filosofia atualizada:
-- O split dos dados (Treino/Val/Teste) é feito a nível de PACIENTE para evitar data leakage.
-- A avaliação final (no evaluate.py) será focada no nível de IMAGEM (cada olho é um caso independente).
+- O split dos dados (Treino/Teste) é feito a nível de PACIENTE para evitar data leakage.
 
 Classificação Binária:
 - Negativo (0): Normal (DG 0)
@@ -40,7 +39,7 @@ DG_CLASS_NAMES_ZHAO: dict[str, int] = {
 
 def build_manifest_zhao(metadata_path: str, images_dir: str) -> pd.DataFrame:
     """
-    Constrói o DataFrame especificamente para o Dataset de Zhao.
+    DataFrame especificamente para o Dataset de Zhao.
     Faz o vínculo PERFEITO entre a imagem na pasta e o ID do paciente na planilha.
     """
     metadata_path = Path(metadata_path)
@@ -138,7 +137,6 @@ def build_tabular_dataset(df: pd.DataFrame, extractor: FeatureExtractor) -> Tupl
 
     return X, y
 
-# ainda nao implementei o treino para ver se aqui vai ser usado
 def build_manifest(metadata_path: str, images_dir: str) -> pd.DataFrame:
     """Constrói um DataFrame mapeando cada imagem utilizável ao seu diagnóstico."""
     metadata_path = Path(metadata_path)
@@ -241,7 +239,6 @@ def split_summary(train_df: pd.DataFrame, test_df: pd.DataFrame) -> pd.DataFrame
 
 
 # ── PyTorch Dataset ──────────────────────────────────────────────────────
-# ainda nao implementei o treino para ver se aqui vai ser usado
 class ROPDataset(Dataset):
     """
     Dataset compatível com as transformações nativas do torchvision (PIL).
