@@ -107,9 +107,6 @@ DG_CLASS_NAMES: dict[str, int] = {
     "Stage 1 ROP": 1,
     "Stage 2 ROP": 2,
     "Stage 3 ROP": 3,
-    "Stage 4 ROP": 4,
-    "Stage 5 ROP": 5,
-    "A-ROP": 6,
     "Laser-treated ROP": 7,
 }
 

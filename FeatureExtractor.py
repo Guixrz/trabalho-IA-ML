@@ -1,4 +1,4 @@
-import cv2
+import cv2 # cvgen
 import numpy as np
 from skimage.feature import graycomatrix, graycoprops
 from pathlib import Path
@@ -30,6 +30,7 @@ class FeatureExtractor:
         if img is None:
             raise ValueError(f"Erro ao carregar a imagem: {image_path}")
 
+        # cores
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # Redimensionamento padrão para garantir que o tempo de cálculo da GLCM seja uniforme
