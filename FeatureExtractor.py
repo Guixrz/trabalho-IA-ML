@@ -1,12 +1,11 @@
-import cv2 # cvgen
+import cv2
 import numpy as np
 from skimage.feature import graycomatrix, graycoprops
-from pathlib import Path
 
 
 class FeatureExtractor:
     """
-    Classe para extrair características estáticas de imagens para algoritmos clássicos de AM.
+    Classe para extrair características estáticas de imagens.
     Extrai:
     - Médias e Desvios Padrões de Cor (Canais RGB)
     - Estatísticas de Textura GLCM (Contraste, Correlação, Energia, Homogeneidade)
@@ -33,7 +32,7 @@ class FeatureExtractor:
         # cores
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # Redimensionamento padrão para garantir que o tempo de cálculo da GLCM seja uniforme
+        # Redimensionamento padrão
         img_rgb = cv2.resize(img_rgb, (224, 224))
 
         if self.apply_clahe:
