@@ -5,7 +5,7 @@ from sklearn.metrics import roc_auc_score, confusion_matrix, accuracy_score, f1_
 from Config import cfg
 from Dataset import build_manifest_zhao, split_patients, build_tabular_dataset
 from FeatureExtractor import FeatureExtractor
-from View import plot_dg_distribution, plot_roc_confusion_matrix, plot_pr_metrics_bar
+from View import plot_dg_distribution, plot_roc_confusion_matrix, plot_pr_metrics_bar,salvar_tabela_csv
 
 def main():
     print("=== Pipeline de Aprendizado de Máquina: Naive Bayes ===\n")
@@ -46,7 +46,7 @@ def main():
     y_proba = nb_model.predict_proba(X_test_scaled)[:, 1]
 
     # limiar
-    limiar_customizado = 0.90 # 50 (padrao) ou 90 %
+    limiar_customizado = cfg.threshold # 50 (padrao) ou 90 %
 
     # criação do y_pred manualmente
     # Se a probabilidade for maior ou igual ao limiar, vira 1. Se não, vira 0.
@@ -85,6 +85,8 @@ def main():
 
     plot_roc_confusion_matrix(y_test, y_proba, y_pred, auroc, "Naive Bayes", path_roc)
     plot_pr_metrics_bar(y_test, y_proba, acc, sensibilidade, especificidade, f1, "Naive Bayes", path_pr)
+    salvar_tabela_csv("NB Sem dense", auroc, acc, sensibilidade, especificidade, f1, cfg.clahe,
+                      limiar_customizado)
 
 if __name__ == "__main__":
     main()

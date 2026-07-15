@@ -14,7 +14,7 @@ from sklearn.metrics import roc_auc_score, confusion_matrix, accuracy_score, f1_
 from Config import cfg
 from Dataset import build_manifest_zhao, split_patients, ROPDataset
 from Transforms import build_transforms
-from View import plot_dg_distribution, plot_roc_confusion_matrix, plot_pr_metrics_bar
+from View import plot_dg_distribution, plot_roc_confusion_matrix, plot_pr_metrics_bar,salvar_tabela_csv
 
 
 def get_densenet_extractor():
@@ -105,7 +105,7 @@ def main():
     y_proba = nb_model.predict_proba(X_test_scaled)[:, 1]
 
     # limiar
-    limiar_customizado = 0.90
+    limiar_customizado = cfg.threshold
     y_pred = (y_proba >= limiar_customizado).astype(int)
 
     # Cálculos exatos das métricas
@@ -142,6 +142,8 @@ def main():
 
     plot_roc_confusion_matrix(y_test, y_proba, y_pred, auroc, "Naive Bayes (CNN Features)", path_roc)
     plot_pr_metrics_bar(y_test, y_proba, acc, sensibilidade, especificidade, f1, "Naive Bayes", path_pr)
+    salvar_tabela_csv("NB com dense", auroc, acc, sensibilidade, especificidade, f1, cfg.clahe,
+                      limiar_customizado)
 
 
 if __name__ == "__main__":

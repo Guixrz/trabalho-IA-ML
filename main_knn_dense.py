@@ -16,7 +16,7 @@ from Config import cfg
 from Dataset import build_manifest_zhao, split_patients, split_summary, ROPDataset
 from Transforms import build_transforms
 
-from View import plot_dg_distribution, plot_roc_confusion_matrix, plot_pr_metrics_bar
+from View import plot_dg_distribution, plot_roc_confusion_matrix, plot_pr_metrics_bar,salvar_tabela_csv
 
 
 def get_densenet_extractor():
@@ -74,7 +74,6 @@ def main():
     train_dataset = ROPDataset(train_df, transform=transform)
     test_dataset = ROPDataset(test_df, transform=transform)
 
-    # num_workers=0 resolve o problema do Windows com o multiprocessing do CLAHE
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False, num_workers=0)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=0)
 
@@ -117,8 +116,7 @@ def main():
     print("\n[5/5] Avaliando o modelo no Conjunto de Teste...")
     y_proba = best_knn.predict_proba(X_test_scaled)[:, 1]
 
-    # Limiar customizado: 0.50 é a regra da maioria para o KNN (ex: 3 de 5 vizinhos = 60%)
-    limiar_customizado = 0.90
+    limiar_customizado = cfg.threshold
     y_pred = (y_proba >= limiar_customizado).astype(int)
 
     # Cálculos exatos das métricas
@@ -156,6 +154,8 @@ def main():
 
     plot_roc_confusion_matrix(y_test, y_proba, y_pred, auroc, "KNN (CNN Features)", path_roc)
     plot_pr_metrics_bar(y_test, y_proba, acc, sensibilidade, especificidade, f1, "KNN", path_pr)
+    salvar_tabela_csv("KNN com dense", auroc, acc, sensibilidade, especificidade, f1, cfg.clahe,
+                      limiar_customizado)
 
 if __name__ == "__main__":
     main()

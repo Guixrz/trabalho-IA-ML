@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 from sklearn.metrics import roc_curve, confusion_matrix, precision_recall_curve, average_precision_score
+import csv
 
 
 def plot_dg_distribution(train_df: pd.DataFrame, test_df: pd.DataFrame, save_path: Path):
@@ -90,3 +91,29 @@ def plot_pr_metrics_bar(y_true, y_scores, acc, sens, espec, f1, model_name: str,
     plt.savefig(save_path, dpi=300)
     plt.close()
     print(f"[+] Gráfico PR + Métricas salvo em: {save_path}")
+
+def salvar_tabela_csv(modelo: str, auroc, acc, sensibilidade, especificidade, f1, clahe: bool, limiar: float):
+    """
+    Salva os resultados formatados para criar a tabela comparativa da apresentação.
+    Linhas: Cenário (Modelo + Clahe + Limiar) | Colunas: Métricas
+    """
+    csv_path = Path("tabela_comparativa_apresentacao1.csv")
+    arquivo_existe = csv_path.exists()
+
+    condicao_clahe = "C/ CLAHE" if clahe else "S/ CLAHE"
+
+    # Ex: "Naive Bayes Manual | C/ CLAHE | Limiar 0.50"
+    nome_cenario = f"{modelo} | {condicao_clahe} | Limiar {limiar:.2f}"
+
+    with open(csv_path, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # Se o arquivo não existir, cria o cabeçalho das métricas na Horizontal
+        if not arquivo_existe:
+            writer.writerow(["Cenário Testado", "AUROC", "Acurácia", "Sensibilidade", "Especificidade", "F1-Score"])
+
+        # Escreve a linha do cenário atual
+        writer.writerow(
+            [nome_cenario, f"{auroc:.4f}", f"{acc:.4f}", f"{sensibilidade:.4f}", f"{especificidade:.4f}", f"{f1:.4f}"])
+
+    print(f"[✓] Tabela atualizada com sucesso no arquivo: {csv_path.name}")

@@ -22,8 +22,6 @@ class ApplyCLAHE:
         self.tile_grid_size = tile_grid_size
 
     def __call__(self, img: Image.Image) -> Image.Image:
-        # Criamos o objeto C++ do OpenCV AQUI dentro.
-        # Isso resolve o erro "cannot pickle cv2.CLAHE object" no Windows!
         clahe = cv2.createCLAHE(clipLimit=self.clip_limit, tileGridSize=self.tile_grid_size)
 
         np_img = np.array(img)
