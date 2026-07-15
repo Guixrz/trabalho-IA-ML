@@ -8,12 +8,14 @@ from torch.utils.data import DataLoader
 from torchvision import models
 
 from sklearn.preprocessing import StandardScaler
-from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.metrics import roc_auc_score, confusion_matrix, accuracy_score, f1_score
 
 from Config import cfg
-from Dataset import build_manifest_zhao, split_patients, ROPDataset
+from Dataset import build_manifest_zhao, split_patients, split_summary, ROPDataset
 from Transforms import build_transforms
+
 from View import plot_dg_distribution, plot_roc_confusion_matrix, plot_pr_metrics_bar
 
 
@@ -22,15 +24,13 @@ def get_densenet_extractor():
     Carrega a DenseNet121 pré-treinada e remove a camada de classificação final.
     O objetivo é usar a rede apenas como um extrator de vetores densos (embeddings).
     """
-    # Carrega a rede 121 com os pesos do ImageNet
     model = models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1)
 
-    # Pega apenas a parte extratora (features) e ignora o classificador linear
     extractor = nn.Sequential(
         model.features,
         nn.ReLU(inplace=True),
-        nn.AdaptiveAvgPool2d((1, 1)),  # Global Average Pooling
-        nn.Flatten()  # Achata o tensor (agora de 1024x1x1 para 1024)
+        nn.AdaptiveAvgPool2d((1, 1)), # Global Average Pooling
+        nn.Flatten()                  # Achata o tensor (1024 atributos)
     )
     return extractor
 
@@ -44,20 +44,18 @@ def extract_deep_features(dataloader, model, device):
     with torch.no_grad():
         for images, labels, _ in tqdm(dataloader, desc="Extraindo Embeddings"):
             images = images.to(device)
-            # A rede gera um vetor gigante de características para cada imagem
             embeddings = model(images)
 
             X_list.append(embeddings.cpu().numpy())
             y_list.append(labels.numpy())
 
-    # Empilha tudo em uma tabela Numpy padrão do scikit-learn
     X = np.vstack(X_list)
     y = np.concatenate(y_list).astype(np.int32)
     return X, y
 
 
 def main():
-    print("=== Pipeline Híbrido: DenseNet Embeddings + Naive Bayes ===\n")
+    print("=== Pipeline Híbrido: DenseNet Embeddings + KNN ===\n")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Utilizando processamento via: {device}")
 
@@ -66,18 +64,19 @@ def main():
     manifest = build_manifest_zhao(cfg.metadata_path, cfg.images_dir)
     train_df, test_df = split_patients(manifest, test_size=cfg.test_size)
 
-    dist_path = Path(cfg.results_dir) / "distribuicao_dados_nb_deep.png"
+    dist_path = Path(cfg.results_dir) / "distribuicao_dados_knn_deep.png"
     plot_dg_distribution(train_df, test_df, dist_path)
 
     # 2. Configurando Datasets e DataLoaders do PyTorch
-    print("\n[2/5] Carregando a DenseNet e processando imagens...")
+    print("\n[2/5] Carregando a DenseNet121 e processando imagens...")
     transform = build_transforms(size=cfg.img_size, clahe=cfg.clahe)
 
     train_dataset = ROPDataset(train_df, transform=transform)
     test_dataset = ROPDataset(test_df, transform=transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False, num_workers=2)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=2)
+    # num_workers=0 resolve o problema do Windows com o multiprocessing do CLAHE
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=False, num_workers=0)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=0)
 
     extractor = get_densenet_extractor().to(device)
 
@@ -90,21 +89,35 @@ def main():
     print(f"\n[!] Dimensionalidade das Features: {X_train.shape[1]} atributos por imagem!")
 
     # 3. Pré-processamento: Padronização
-    print("\n[3/5] Padronizando as características extraídas pela CNN...")
+    # Fundamental para o KNN não sofrer distorções no cálculo da distância euclidiana
+    print("\n[3/5] Padronizando as 1024 características extraídas pela CNN...")
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    # 4. Treinamento do Modelo Clássico
-    print(f"\n[4/5] Treinando o modelo Gaussian Naive Bayes (var_smoothing={cfg.nb_var_smoothing})...")
-    nb_model = GaussianNB(var_smoothing=cfg.nb_var_smoothing)
-    nb_model.fit(X_train_scaled, y_train)
+    # 4. Treinamento do Modelo com Busca de Hiperparâmetros (GridSearchCV)
+    print("\n[4/5] Realizando Validação Cruzada para encontrar o melhor K...")
 
-    # 5. Avaliação do Modelo
+    # Parâmetros que serão testados automaticamente
+    param_grid = {
+        "n_neighbors": [1, 3, 5, 7, 9, 11, 15],
+        "weights": ["uniform", "distance"],
+        "metric": ["euclidean", "manhattan"]
+    }
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=cfg.seed)
+
+    grid = GridSearchCV(KNeighborsClassifier(), param_grid, cv=cv, scoring="f1")
+    grid.fit(X_train_scaled, y_train)
+
+    best_knn = grid.best_estimator_
+    print(f"      -> Melhor configuração encontrada: {grid.best_params_}")
+
+    # 5. Avaliação do Modelo no Conjunto de Teste
     print("\n[5/5] Avaliando o modelo no Conjunto de Teste...")
-    y_proba = nb_model.predict_proba(X_test_scaled)[:, 1]
+    y_proba = best_knn.predict_proba(X_test_scaled)[:, 1]
 
-    # limiar
+    # Limiar customizado: 0.50 é a regra da maioria para o KNN (ex: 3 de 5 vizinhos = 60%)
     limiar_customizado = 0.90
     y_pred = (y_proba >= limiar_customizado).astype(int)
 
@@ -118,10 +131,11 @@ def main():
     especificidade = tn / (tn + fp) if (tn + fp) > 0 else 0
 
     print("\n" + "=" * 90)
-    print("RELATÓRIO DE MÉTRICAS - NAIVE BAYES (DENSENET FEATURES)")
+    print("RELATÓRIO DE MÉTRICAS - KNN (DENSENET FEATURES)")
     print("=" * 90)
+    print(f"Hiperparâmetros Ótimos    : K={grid.best_params_['n_neighbors']}, Peso={grid.best_params_['weights']}, Dist={grid.best_params_['metric']}")
     print(f"Limiar (Threshold) Usado  : {limiar_customizado:.2f} ({limiar_customizado * 100:.0f}%)")
-    print(f"Pré-processamento         : {'CLAHE Ativado' if cfg.clahe else 'Padrão'}")
+    print(f"Pré-processamento         : {'CLAHE Ativado' if cfg.clahe else 'Padrão'} + StandardScaler")
     print("-" * 90)
     print(f"AUROC                     : {auroc:.4f}")
     print(f"Acurácia Global           : {acc:.4f}")
@@ -136,13 +150,12 @@ def main():
     print(f" - FN (Falsos Negativos)      : {fn}")
     print("=" * 90)
 
-    # Gerando as imagens do Dashboard
-    path_roc = Path(cfg.results_dir) / "grafico_roc_cm_nb_deep.png"
-    path_pr = Path(cfg.results_dir) / "grafico_pr_metrics_nb_deep.png"
+    # Gerando os 2 arquivos de imagem com os Gráficos
+    path_roc = Path(cfg.results_dir) / "grafico_roc_cm_knn_deep.png"
+    path_pr = Path(cfg.results_dir) / "grafico_pr_metrics_knn_deep.png"
 
-    plot_roc_confusion_matrix(y_test, y_proba, y_pred, auroc, "Naive Bayes (CNN Features)", path_roc)
-    plot_pr_metrics_bar(y_test, y_proba, acc, sensibilidade, especificidade, f1, "Naive Bayes", path_pr)
-
+    plot_roc_confusion_matrix(y_test, y_proba, y_pred, auroc, "KNN (CNN Features)", path_roc)
+    plot_pr_metrics_bar(y_test, y_proba, acc, sensibilidade, especificidade, f1, "KNN", path_pr)
 
 if __name__ == "__main__":
     main()
