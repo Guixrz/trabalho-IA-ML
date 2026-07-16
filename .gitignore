@@ -4,3 +4,6 @@
 /.venv
 /tabelas
 /tabela_comparativa_apresentacao1.csv
+.idea/
+__pycache__/
+*.pyc
